@@ -1,0 +1,244 @@
+#!/usr/bin/emacs --script
+
+
+;;
+;; configuration -- change these to customize
+;;
+
+(setq list-start-tag "<ul>")		;change to <ol> for an ordered list
+(setq list-end-tag "</ul>")		;change to </ol> for an ordered list
+(setq debug-on-error t)			;print something useful on failure
+(setq prompt-before-clobbering nil)	;change to t to prevent overwriting target file without prompting
+
+;;
+;; Print command line usage
+;;
+
+(defun usage ()
+  (message "
+Usage: thinkbook2html [path to outline .txt file] [optional, name of .html file to write]
+
+e.g. thinkbook2html ~/Dropbox/myoutline.txt 
+     writes out HTML file ~/Dropbox/myoutline.html, replacing any existing file.
+
+e.g. thinkbook2html ~/Dropbox/myoutline.txt ~/Desktop/myoutline.html
+     writes out the second file in the specified location.
+"))
+
+;;
+;; Functions
+;;
+
+(defun convert-thinkbook-outline ()
+  "Convert a ThinKBook outline to HTML"
+  (interactive)
+
+  (normalize-answers)
+
+  ;; go past the title to the first item in the outline
+  (goto-char (point-min))
+  (while (search-forward "* [NOTEBOOK]  " nil t)
+    (replace-match "" nil t))
+
+  (search-forward "- ")
+
+  ;; remove blank lines between top-level items
+  (while (search-forward "\n\n" nil t)
+    (replace-match "\n" nil t))
+
+  ;; insert a marker at the end
+  (goto-char (point-max))
+  (insert "  \nEND")
+
+  ;; back to the top to start processing
+  (goto-char (point-min))
+  (search-forward "- ")
+  (beginning-of-line)
+
+  (let 
+      ( (previous-level 0)		;how deeply nested the last level was
+	(current-level 0) 		;how deeply nested the current level is
+	(indent "")			;how deeply to indent the current level
+	)
+
+    ;; process each line until we get to END, indenting or outdenting as
+    ;; necessary
+    (while (not (looking-at "END"))
+
+      (setq current-level (get-level))
+      (setq indent (get-current-indent current-level))
+
+      (cond 
+
+       ;; if we're going deeper, indent with a new list. ThinkBook
+       ;; only lets levels get deeper one at a time.
+       ((> current-level previous-level)
+	(replace-dashes (concat indent list-start-tag "\n" indent "<li>") "</li>")
+	)
+
+       ;; if we're at the same level, wrap the currrent item in an LI
+       ((= current-level previous-level)
+	(replace-dashes (concat indent "<li>") "</li>")
+	)
+
+       ;; if we're getting shallower, close as many levels of the
+       ;; outline as necesary to make the level match the new level. 
+       ((< current-level previous-level)
+	(let* ((num (- previous-level current-level)) ;difference between the levels
+	       (closes "")			      ;string to use to close out the previous levels 
+	       (replace (concat "\n"  indent "<li>"))) ;will become what we prepend to the current line
+
+	  (while (> num 0)
+	    (setq closes (concat closes list-end-tag))
+	    (setq num (- num 1))
+	    )
+	  (setq replace (concat indent closes replace))
+	  
+	  (replace-dashes replace "</li>" )
+	  )
+	)
+       )
+
+      (forward-line 1)
+      (beginning-of-line)
+
+      (setq previous-level current-level)
+      )
+    )
+
+  ;; now a little more cleanup and htmlification
+  (if (looking-at "END")
+      (delete-char 3))
+
+  (insert "</body></html>")
+  (goto-char (point-min))
+
+  (insert "<html><head><title>")
+  (setq beginning-of-title (point))
+  (end-of-line)
+  (setq end-of-title (point))
+  (insert "</title></head><body>")
+
+  (insert (concat "<h1>" (buffer-substring beginning-of-title end-of-title) "</h1>"))
+  
+  ;; there's going to be a blank item at the end; remove it now
+  (goto-char (point-min))
+  (while (search-forward "<li></li>" nil t)
+    (replace-match "" nil t))
+)
+
+(defun normalize-answers ()
+  "Answers seem to come after questions but on a new blank line with no prefix. Join them to the previous line."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward "^[ ]*ANSWER " nil t)
+      (beginning-of-line)
+      (join-line)
+      (end-of-line)
+      )
+    )
+)
+
+(defun get-current-indent (depth)
+  "return the string to use to indent the current level"
+  (let ((indent ""))
+    (dotimes (i depth)
+      (setq indent (concat "   " indent))
+      )
+    indent
+    )
+  )
+
+
+(defun replace-dashes (before after)
+  "Remove --'s and add the supplied markup before and after"
+  (let* ((start (point))
+	 (end (save-excursion
+		(re-search-forward (concat "\\("
+					   "  "
+					   "\\|"
+					   (regexp-quote " [QUESTION] ")
+					   "\\|"
+					   (regexp-quote " []  ")
+					   "\\)"
+					   ))
+		(point)
+		))
+	 )
+    (delete-region start end)
+    (beginning-of-line)
+    (insert before)
+    (end-of-line)
+    (insert after)
+    )
+  )
+
+;; I know, this is incredibly lame. But it was really quick to
+;; write. I should have spent 10 more minutes reading the elisp
+;; manual.  Please, fork this and show me how it should have been done
+;; ;-)
+
+(defun get-level ()
+  (cond 
+   ((looking-at "- ")
+    1 )
+   ((looking-at "-- ")
+    2 )
+   ((looking-at "--- ")
+    3 )
+   ((looking-at "---- ")
+    4 )
+   ((looking-at "----- ")
+    5 )
+   ((looking-at "------ ")
+    6 )
+   ((looking-at "------- ")
+    7 )
+   ((looking-at "-------- ")
+    8 )
+   ((looking-at "--------- ")
+    9 )
+   ((looking-at "---------- ")
+    10 )
+   ((looking-at "----------- ")
+    11 )
+   ((looking-at "------------ ")
+    12 )
+   ((looking-at "------------- ")
+    13 )
+   ((looking-at "-------------- ")
+    14 )
+   ((looking-at "--------------- ")
+    15 ) ;enough, right?
+   (t
+    0)
+   ))
+
+;;
+;; mainline -- this is what executes when you run this script
+;;
+
+(if (eq command-line-args-left nil)
+    (usage)
+
+  ;; else
+
+  (let* ((input-file (find-file (car command-line-args-left )))
+	 (input-filename (buffer-file-name input-file))
+	 (input-html-filename (concat (file-name-sans-extension input-filename) ".html"))
+	 (second-command-line-arg (car (cdr command-line-args-left)))
+	 (output-filename second-command-line-arg)
+	 )
+
+    (if (not second-command-line-arg)
+	(setq output-filename input-html-filename))
+
+    (message (concat "Converting ThinkBook outline " (buffer-file-name) " to " output-filename))
+
+    (convert-thinkbook-outline)
+    (write-file output-filename prompt-before-clobbering)
+
+    ))
+
+

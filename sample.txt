@@ -1,0 +1,14 @@
+* [NOTEBOOK]  Sample Notebook
+
+-  This is the first top-level item
+--  Second level
+---  Third level
+---  Another third level
+
+-  Second top-level item
+-- [QUESTION] A question? 
+       ANSWER The answer to the question
+--  An item
+-- [ ]  A to-do
+
+-  Last top-level item
