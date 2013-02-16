@@ -113,7 +113,7 @@ e.g. thinkbook2html ~/Dropbox/myoutline.txt ~/Desktop/myoutline.html
   (insert "</body></html>")
   (goto-char (point-min))
 
-  (insert "<html><head><title>")
+  (insert "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"><title>")
   (setq beginning-of-title (point))
   (end-of-line)
   (setq end-of-title (point))
