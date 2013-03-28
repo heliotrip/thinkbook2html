@@ -9,6 +9,7 @@
 (setq list-end-tag "</ul>")		;change to </ol> for an ordered list
 (setq debug-on-error t)			;print something useful on failure
 (setq prompt-before-clobbering nil)	;change to t to prevent overwriting target file without prompting
+(setq checkbox-bullets nil)		;change to t to use checkbox images instead of standard html bullets
 
 ;;
 ;; Print command line usage
@@ -117,7 +118,16 @@ e.g. thinkbook2html ~/Dropbox/myoutline.txt ~/Desktop/myoutline.html
   (setq beginning-of-title (point))
   (end-of-line)
   (setq end-of-title (point))
-  (insert "</title></head><body>")
+  (insert "</title>")
+  (if checkbox-bullets
+      (insert "<style type=\"text/css\">
+li 
+{ 
+    list-style-image: url('http://bit.ly/qunMkL'); 
+    list-style-position: inside;
+}
+</style>"))
+  (insert "</head><body>")
 
   (insert (concat "<h1>" (buffer-substring beginning-of-title end-of-title) "</h1>"))
   
